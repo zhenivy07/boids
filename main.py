@@ -1,3 +1,12 @@
+""" KEY FEATURES
+* Boid ('bird-oid object') flocking behavior (separation, cohesion, and alignment behaviors)
+* Wind ('w') causes birds and clouds to move in certain directions and blows at different frequencies
+* Cloudiness ('c') causes birds to fly slower
+* Higher temperature ('t') causes birds to fly further apart, lower temperatures cause increased flocking
+* The mouse acts as a toggleable predator ('p') that boids avoid
+* There shouldn't be any grading shortcuts needed
+"""
+
 from cmu_graphics import *
 import math
 import random
@@ -344,13 +353,13 @@ def onKeyHold(app, keys):
             app.tempFactor += 1
 
     elif app.weatherMode == 'clouds':
-        if 'left' in keys and app.minSpeed >= 1 and app.maxSpeed >= 6:
-            app.minSpeed -= 0.2
-            app.maxSpeed -= 0.2
-            app.cloudFactor = max(0, app.cloudFactor - 0.1)
-        if 'right' in keys and app.minSpeed <= 9 and app.maxSpeed <= 14:
+        if 'left' in keys and app.minSpeed <= 9 and app.maxSpeed <= 14:
             app.minSpeed += 0.2
             app.maxSpeed += 0.2
+            app.cloudFactor = max(0, app.cloudFactor - 0.1)
+        if 'right' in keys and app.minSpeed >= 1 and app.maxSpeed >= 6:
+            app.minSpeed -= 0.2
+            app.maxSpeed -= 0.2
             app.cloudFactor = min(1, app.cloudFactor + 0.1)
 
 
