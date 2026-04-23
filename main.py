@@ -2,6 +2,12 @@ from cmu_graphics import *
 import math
 import random
 
+# Each function, if multiple things are updated within 1 function should be updated in the order
+# 1. Background and labels
+# 2. Boids (separation --> cohesion --> alignment --> predator behavior)
+# 3. Weather (wind --> clouds --> temperature)
+# 4. Other
+
 
 def onAppStart(app):
     resetApp(app)
@@ -25,11 +31,15 @@ def resetApp(app):
     app.visRange = 100  # boids will match avg velocity & CoM of other boids here
     app.protectRange = 20  # boids move away from other boids here
 
+    # SEPARATION -- close_dx & close_dy * SF
+    app.sepFactor = 0.05
+
     # COHESION --  v changes by (distance from center of flock) * CF
     app.coFactor = 0.0005
+
     # ALIGNMENT -- (difference of avg vel & boid vel) * AF
     app.alignFactor = 0.05
-    app.sepFactor = 0.05  # close_dx & close_dy * SF
+
     # if close enough to edge, v nudged back by 0.5 (flat)
     app.turnFactor = 0.5
 
@@ -189,7 +199,7 @@ def updateBoids(app):
                     dist2 = dx ** 2 + dy ** 2
 
                     if dist2 < protectRange2:
-                        # sum of distances from every boid in protected range
+                        # FOR SEPARATION -- sum of distances from every boid in protected range
                         closeDx += dx
                         closeDy += dy
                     elif dist2 < visRange2:
@@ -200,12 +210,12 @@ def updateBoids(app):
                         yVelAvg += other['vy']
                         neighbors += 1  # increment neighbirds used to calculate avgs
 
+        # call separation
+        separation(app, boid, closeDx, closeDy, margin)
+
         # call cohesion & alignment
         cohesionAndAlignment(app, neighbors, boid, xPosAvg,
                              yPosAvg, xVelAvg, yVelAvg)
-
-        # call separation
-        separation(app, boid, closeDx, closeDy, margin)
 
         # call predator fctn
         if app.predMode:
@@ -228,13 +238,64 @@ def updateBoids(app):
 
         # -- exempt code end --
 
+        # once all changes made, increment positions
         boid['x'] += boid['vx']
         boid['y'] += boid['vy']
 
-        # prevent going off screen
-
+        # hard stop to prevent going off screen
         boid['x'] = max(5, min(app.width - 5, boid['x']))
         boid['y'] = max(5, min(app.height - 5, boid['y']))
+
+# Followed "https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html" for separation & cohesionAndAlignment
+# For the next 2 functions, Claude helped debug and keep track of variables
+
+
+def separation(app, boid, closeDx, closeDy, margin):
+    # SEPARATION -- velocity changes by total distance away * SF
+    boid['vx'] += closeDx * app.sepFactor
+    boid['vy'] += closeDy * app.sepFactor
+
+    # Turn away from edges
+    if boid['x'] < margin:
+        boid['vx'] += app.turnFactor
+    if boid['x'] > app.width - margin:
+        boid['vx'] -= app.turnFactor
+    if boid['y'] < margin:
+        boid['vy'] += app.turnFactor
+    if boid['y'] > app.height - margin:
+        boid['vy'] -= app.turnFactor
+
+
+def cohesionAndAlignment(app, neighbors, boid, xPosAvg, yPosAvg, xVelAvg, yVelAvg):
+    if neighbors > 0:
+        # calculate actual avgs here
+        xPosAvg /= neighbors
+        yPosAvg /= neighbors
+        xVelAvg /= neighbors
+        yVelAvg /= neighbors
+
+        # COHESION -- boid steers towards neighbors CoM
+        # update velocity with distance between CoM * CF
+        boid['vx'] += (xPosAvg - boid['x']) * app.coFactor
+        boid['vy'] += (yPosAvg - boid['y']) * app.coFactor
+
+        # ALIGNMENT -- boid matches velocity of neighbors
+        # difference between average v's and current boid v
+        boid['vx'] += (xVelAvg - boid['vx']) * app.alignFactor
+        boid['vy'] += (yVelAvg - boid['vy']) * app.alignFactor
+
+# Predator behavior adapted from "http://www.kfish.org/boids/pseudocode.html"
+
+
+def avoidPredator(app, boid):
+    xPos, yPos = boid['x'], boid['y']
+    dx, dy = (xPos - app.mouseX), (yPos - app.mouseY)
+
+    # if the boid is within range
+    if (dx**2 + dy**2) < app.predRad**2:
+        # get further away from whatever edge of circle it's on using sep logic
+        boid['vx'] += app.predFactor * dx
+        boid['vy'] += app.predFactor * dy
 
 
 def onMouseMove(app, mouseX, mouseY):
@@ -291,57 +352,6 @@ def onKeyHold(app, keys):
             app.minSpeed += 0.2
             app.maxSpeed += 0.2
             app.cloudFactor = min(1, app.cloudFactor + 0.1)
-
-# Followed "https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html" for separation & cohesionAndAlignment
-# For the next 2 functions, Claude helped debug and keep track of variables
-
-
-def separation(app, boid, closeDx, closeDy, margin):
-    # SEPARATION -- velocity changes by total distance away * SF
-    boid['vx'] += closeDx * app.sepFactor
-    boid['vy'] += closeDy * app.sepFactor
-
-    # Turn away from edges
-    if boid['x'] < margin:
-        boid['vx'] += app.turnFactor
-    if boid['x'] > app.width - margin:
-        boid['vx'] -= app.turnFactor
-    if boid['y'] < margin:
-        boid['vy'] += app.turnFactor
-    if boid['y'] > app.height - margin:
-        boid['vy'] -= app.turnFactor
-
-
-def cohesionAndAlignment(app, neighbors, boid, xPosAvg, yPosAvg, xVelAvg, yVelAvg):
-    if neighbors > 0:
-        # calculate actual avgs here
-        xPosAvg /= neighbors
-        yPosAvg /= neighbors
-        xVelAvg /= neighbors
-        yVelAvg /= neighbors
-
-        # COHESION -- boid steers towards neighbors CoM
-        # update velocity with distance between CoM * CF
-        boid['vx'] += (xPosAvg - boid['x']) * app.coFactor
-        boid['vy'] += (yPosAvg - boid['y']) * app.coFactor
-
-        # ALIGNMENT -- boid matches velocity of neighbors
-        # difference between average v's and current boid v
-        boid['vx'] += (xVelAvg - boid['vx']) * app.alignFactor
-        boid['vy'] += (yVelAvg - boid['vy']) * app.alignFactor
-
-# Predator behavior adapted from "http://www.kfish.org/boids/pseudocode.html"
-
-
-def avoidPredator(app, boid):
-    xPos, yPos = boid['x'], boid['y']
-    dx, dy = (xPos - app.mouseX), (yPos - app.mouseY)
-
-    # if the boid is within range
-    if (dx**2 + dy**2) < app.predRad**2:
-        # get further away from whatever edge of circle it's on using sep logic
-        boid['vx'] += app.predFactor * dx
-        boid['vy'] += app.predFactor * dy
 
 
 def onStep(app):
