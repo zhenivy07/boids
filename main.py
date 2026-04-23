@@ -28,6 +28,7 @@ def onAppStart(app):
     # init random pos for clouds
     app.clouds = []
     addClouds(app)
+    app.cloudShade = CloudShade()
 
     # init temp shade
     app.tempShade = TempShade()
@@ -150,6 +151,7 @@ def redrawAll(app):
     # drawing weather
     for cloud in app.clouds:
         cloud.draw()
+    app.cloudShade.draw(app)
 
     # temp overlay
     app.tempShade.draw(app)
@@ -409,7 +411,7 @@ class Cloud:
         # --exempt--
         # Claude wrote partially
         if self.fadingOut:
-            self.opacity = max(0, self.opacity - 2)
+            self.opacity = max(0, self.opacity - 5)
         else:
             self.opacity = min(80, self.opacity + 2)
         # --end of exempt--
@@ -429,10 +431,19 @@ class Cloud:
 # for this function, Claude gave me outline/approach
 
 
-class TempShade:
+class Overlay:
     def __init__(self):
         self.opacity = 2
 
+
+class CloudShade(Overlay):
+    def draw(self, app):
+        # the cloudier, the greater the opacity
+        opacity = int(app.cloudFactor * 40)
+        drawRect(0, 0, app.width, app.height, fill='dimGray', opacity=opacity)
+
+
+class TempShade(Overlay):
     def draw(self, app):
         if app.tempFactor < 0:  # cold
             r, g, b, = 0, 0, 255
