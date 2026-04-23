@@ -21,7 +21,7 @@ def onAppStart(app):
 def resetApp(app):
     app.stepsPerSecond = 12
 
-    app.numBoids = 300
+    app.numBoids = 375
     app.visRange = 100  # boids will match avg velocity & CoM of other boids here
     app.protectRange = 20  # boids move away from other boids here
 
@@ -54,7 +54,8 @@ def resetApp(app):
 
     app.showMenu = True
 
-# For the next 4 functions, Claude helped debug, structure code, and adapt code to cmugraphics
+# For the next 5 functions from addBoids - updateBoids,
+# Claude helped debug, structure code, and adapt code to cmugraphics
 
 
 def addBoids(app):
@@ -134,6 +135,21 @@ def redrawAll(app):
     # temp overlay
     app.tempShade.draw(app)
 
+# Claude wrote this, my lovely mentor Meabh helped come up w idea to reduce lag :)
+
+
+def buildGrid(app):
+    cellSize = app.visRange
+    grid = {}
+    for i, boid in enumerate(app.boids):
+        # get cell this boid is in
+        row = int(boid['y'] // cellSize)
+        col = int(boid['x'] // cellSize)
+        if (row, col) not in grid:
+            grid[(row, col)] = []
+        grid[(row, col)].append(i)
+    return grid
+# -- End citation --
 
 # Psuedocode for updateBoids from "https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html"
 
@@ -143,6 +159,8 @@ def updateBoids(app):
     visRange2 = app.visRange ** 2
     protectRange2 = app.protectRange ** 2
     margin = app.margin
+    cellSize = app.visRange
+    grid = buildGrid(app)
 
     for i, boid in enumerate(app.boids):
         # zeroed so each boid's position can be added to it as changes happen
@@ -150,31 +168,37 @@ def updateBoids(app):
         closeDx = closeDy = 0
         neighbors = 0
 
-        # loop through every other boid
-        for j, other in enumerate(app.boids):
-            if i == j:  # skip "current" outer loop boid
-                continue
+        row = int(boid['y'] // cellSize)
+        col = int(boid['x'] // cellSize)
 
-            # determines distance between boids
-            dx = boid['x'] - other['x']
-            dy = boid['y'] - other['y']
+        # check boids in neighboring cells
+        # claude wrote this part
+        for drow in [-1, 0, 1]:
+            for dcol in [-1, 0, 1]:
+                # get the boids in the neighboring cells
+                for j in grid.get((row+drow, col+dcol), []):
+                    if i == j:  # skip "current" outer loop boid
+                        continue
+        # end citation
+                    # actually grab each other boid from neighboring grids
+                    other = app.boids[j]
 
-            # only change pos if within visual range
-            if abs(dx) < app.visRange and abs(dy) < app.visRange:
-                # actually check the dist now for protected vs visual range
-                dist2 = dx ** 2 + dy ** 2
+                    # determines distance between boids
+                    dx = boid['x'] - other['x']
+                    dy = boid['y'] - other['y']
+                    dist2 = dx ** 2 + dy ** 2
 
-                if dist2 < protectRange2:
-                    # sum of distances from every boid in protected range
-                    closeDx += dx
-                    closeDy += dy
-                elif dist2 < visRange2:
-                    # FOR COHESION & ALIGNMENT -- sum up pos of neighboids
-                    xPosAvg += other['x']
-                    yPosAvg += other['y']
-                    xVelAvg += other['vx']
-                    yVelAvg += other['vy']
-                    neighbors += 1  # increment neighbirds used to calculate avgs
+                    if dist2 < protectRange2:
+                        # sum of distances from every boid in protected range
+                        closeDx += dx
+                        closeDy += dy
+                    elif dist2 < visRange2:
+                        # FOR COHESION & ALIGNMENT -- sum up pos of neighboids
+                        xPosAvg += other['x']
+                        yPosAvg += other['y']
+                        xVelAvg += other['vx']
+                        yVelAvg += other['vy']
+                        neighbors += 1  # increment neighbirds used to calculate avgs
 
         # call cohesion & alignment
         cohesionAndAlignment(app, neighbors, boid, xPosAvg,
