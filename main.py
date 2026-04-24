@@ -103,8 +103,6 @@ def redrawAll(app):
     # background from bedneyimages on freepik
     drawImage('sky_background.jpg', 0, 0, width=app.width, height=app.height)
 
-    drawMenu(app)
-
     # drawing the boid
     for boid in app.boids:
         drawBoid(boid)
@@ -125,6 +123,9 @@ def redrawAll(app):
     # grass
     for p in app.windParticles:
         p.draw()
+
+    # draw menu @ end
+    drawMenu(app)
 
 
 def drawMenu(app):
@@ -220,23 +221,27 @@ def drawBoid(boid):
 
     drawPolygon(x1, y1, x2, y2, x3, y3)
 
-# Claude wrote this, my lovely mentor Meabh helped come up w idea to reduce lag :)
+# Claude helped write this, and my lovely mentor Meabh helped come up w idea to reduce lag :)
+
+# adding all the boids to respective cells in hypothetical grid
 
 
 def buildGrid(app):
-    cellSize = app.visRange
-    grid = {}
-    for i, boid in enumerate(app.boids):
-        # get cell this boid is in
-        row = int(boid['y'] // cellSize)
-        col = int(boid['x'] // cellSize)
-        if (row, col) not in grid:
-            grid[(row, col)] = []
-        grid[(row, col)].append(i)
-    return grid
-# -- End citation --
+    # have size for cell
+    cellSize = app.width // 10
+    grid = dict()
 
-# Psuedocode for updateBoids from "https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html"
+    for i, boid in enumerate(app.boids):
+        boidRow = boid['y'] // cellSize
+        boidCol = boid['x'] // cellSize
+
+        if (boidRow, boidCol) not in grid:
+            grid[(boidRow, boidCol)] = [i]
+        else:
+            grid[(boidRow, boidCol)].append(i)
+
+    return grid
+    # Psuedocode for updateBoids from "https://vanhunteradams.com/Pico/Animal_Movement/Boids-algorithm.html"
 
 
 def updateBoids(app):
@@ -253,16 +258,16 @@ def updateBoids(app):
         closeDx = closeDy = 0
         neighbors = 0
 
-        row = int(boid['y'] // cellSize)
-        col = int(boid['x'] // cellSize)
+        boidRow = boid['y'] // cellSize
+        boidCol = boid['x'] // cellSize
 
         # check boids in neighboring cells
-        # claude wrote this part
         for drow in [-1, 0, 1]:
             for dcol in [-1, 0, 1]:
                 # get the boids in the neighboring cells
-                for j in grid.get((row+drow, col+dcol), []):
-                    if i == j:  # skip "current" outer loop boid
+                for j in grid.get((boidRow + drow, boidCol + dcol), []):
+                    # skip "current" outer loop boid
+                    if i == j:
                         continue
         # end citation
                     # actually grab each other boid from neighboring grids
