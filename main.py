@@ -33,6 +33,8 @@ def onAppStart(app):
     # init temp shade
     app.tempShade = TempShade()
 
+    app.windParticles = []
+
 
 def resetApp(app):
     app.stepsPerSecond = 12
@@ -72,7 +74,7 @@ def resetApp(app):
     app.cloudFactor = 0.4
     app.tempFactor = 0
 
-    app.showMenu = True
+    app.menuOpen = True
 
 # For the next 5 functions from addBoids - updateBoids,
 # Claude helped debug, structure code, and adapt code to cmugraphics
@@ -100,48 +102,12 @@ def addClouds(app):
 def redrawAll(app):
     # background from bedneyimages on freepik
     drawImage('sky_background.jpg', 0, 0, width=app.width, height=app.height)
-    # weather instructions
-    if app.showMenu:
-        drawRect(30, app.height-190, 350, 158, fill='gray',
-                 border='black', borderWidth=1)
 
-        windLabel = 'tomato' if app.weatherMode == 'wind' else 'white'
-        cloudLabel = 'tomato' if app.weatherMode == 'clouds' else 'white'
-        tempLabel = 'tomato' if app.weatherMode == 'temp' else 'white'
-
-        drawLabel("Press 'w' and the L/R arrow keys to change wind strength",
-                  50, app.height-175, fill=windLabel, size=12, align='left')
-        drawLabel("Press 'c' and the L/R arrow keys to change cloud coverage",
-                  50, app.height-150, fill=cloudLabel, size=12, align='left')
-        drawLabel("Press 't' and the L/R arrow keys to change temperature",
-                  50, app.height-125, fill=tempLabel, size=12, align='left')
-        drawLabel("Press 'p' to toggle cursor predator",
-                  50, app.height-100, fill='white', size=12, align='left')
-        drawLabel("Press 'r' to reset weather conditions",
-                  50, app.height-75, fill='white', size=12, align='left')
-        drawLabel("Press 'space' to close menu",
-                  50, app.height-50, fill='white', size=12, align='left')
-
-        # labels for changing weather conditions
-        if app.weatherMode != None:
-            if app.weatherMode == 'wind':
-                label1 = f"Wind factor = {pythonRound(app.windFactor, 2)}"
-                label2 = f"Wind frequency = {app.windFreq}"
-            elif app.weatherMode == 'clouds':
-                label1 = f"Min. speed = {pythonRound(app.minSpeed, 2)}"
-                label2 = f"Max. speed = {pythonRound(app.maxSpeed, 2)}"
-            else:  # temp
-                label1 = f"Separation factor = {pythonRound(app.sepFactor, 2)}"
-                label2 = f"Protected radius = {app.protectRange}"
-
-            drawLabel(label1, app.width-200, 50,
-                      fill='white', align='left', size=12)
-            drawLabel(label2, app.width-200, 75,
-                      fill='white', align='left', size=12)
+    drawMenu(app)
 
     # drawing the boid
     for boid in app.boids:
-        drawCircle(boid['x'], boid['y'], 2)
+        drawBoid(boid)
 
     # draw 'predator'
     if app.predMode:
@@ -155,6 +121,104 @@ def redrawAll(app):
 
     # temp overlay
     app.tempShade.draw(app)
+
+    # grass
+    for p in app.windParticles:
+        p.draw()
+
+
+def drawMenu(app):
+    menuWidth = 350
+
+    if app.menuOpen:
+        drawRect(0, 0, menuWidth, app.height, opacity=70)
+        drawLabel('←', 20, 40, fill='white', size=20, align='left')
+        drawLabel('Boids Simulation - Starling Murmurations', 20,
+                  75, fill='white', size=15, bold=True, align='left')
+
+        # https://cs.stanford.edu/people/eroberts/courses/soco/projects/2008-09/modeling-natural-systems/boids.html
+
+        drawLabel("This algorithm models how individual boid (bird-oid object)",
+                  20, 100, fill='white', size=10, align='left')
+        drawLabel(
+            "movement affects the bulk motion of the flock.", 20, 110, fill='white', size=10, align='left')
+        drawLabel("Each boid follows three rules: ", 20,
+                  130, fill='white', size=10, align='left', bold=True)
+        drawLabel("1. Separation (avoid collision)", 20,
+                  145, fill='white', size=10, align='left')
+        drawLabel("2. Cohesion (stay close to neighbors)", 20,
+                  155, fill='white', size=10, align='left')
+        drawLabel("3. Alignment (matching velocities)", 20,
+                  165, fill='white', size=10, align='left')
+
+        controls = [
+            ('w', 'and the L/R arrow keys to change wind strength',
+             app.weatherMode == 'wind'),
+            ('c', 'and the L/R arrow keys to change cloud coverage',
+             app.weatherMode == 'clouds'),
+            ('t', 'and the L/R arrow keys to change temperature',
+             app.weatherMode == 'temp'),
+            ('p', 'to toggle predator', False),
+            ('r', 'to reset weather conditions', False)
+        ]
+
+        # INSTRUCTIONS
+        drawLabel('CONTROLS', 20, 650, fill='white',
+                  size=15, bold=True, align='left')
+
+        for idx, (key, label, state) in enumerate(controls):
+            y = 675 + idx * 25
+            color = 'tomato' if state else 'white'
+            drawLabel(f"Press {key} {label}", 20, y,
+                      fill=color, size=12, align='left')
+
+        # CURRENT CONDITIONS
+        # labels for when weather conditions are changing
+        drawLabel('CURRENT CONDITIONS', 20, 825, fill='white',
+                  size=15, bold=True, align='left')
+
+        drawLabel(f"Wind factor:   {pythonRound(app.windFactor, 2)}", 20, 850,
+                  fill='white', size=11, align='left')
+        drawLabel(f"Cloud factor:  {pythonRound(app.cloudFactor, 2)}", 20, 875,
+                  fill='white', size=11, align='left')
+        drawLabel(f"Temperature:   {app.tempFactor}", 20, 900,
+                  fill='white', size=11, align='left')
+
+    # hide menu
+    else:
+        drawRect(0, app.height//2 - 30, 25, 60, opacity=70)
+        drawLabel('→', 12, app.height//2, fill='white', size=20)
+
+# boids as triangles
+
+
+def onMousePress(app, mouseX, mouseY):
+    # this is for the menu opening button
+    if not app.menuOpen:
+        if mouseX < 18:
+            app.menuOpen = True
+    else:
+        if mouseX < 50 and mouseY < 50:
+            app.menuOpen = False
+
+
+def drawBoid(boid):
+    angle = math.atan2(boid['vy'], boid['vx'])
+    size = 4
+
+    # POINT 1 - tip of triangle
+    x1 = boid['x'] + size * math.cos(angle)
+    y1 = boid['y'] + size * math.sin(angle)
+
+    # POINT 2 - back corner 1
+    x2 = boid['x'] + size * math.cos(angle + 1.5)
+    y2 = boid['y'] + size * math.sin(angle + 1.5)
+
+    # POINT 3 - back corner 2
+    x3 = boid['x'] + size * math.cos(angle - 1.5)
+    y3 = boid['y'] + size * math.sin(angle - 1.5)
+
+    drawPolygon(x1, y1, x2, y2, x3, y3)
 
 # Claude wrote this, my lovely mentor Meabh helped come up w idea to reduce lag :)
 
@@ -236,7 +300,6 @@ def updateBoids(app):
         boid['vx'] += app.currentGust * app.windFactor
 
         # Force speed to stay mbetween min & max speed
-        # -- exempt code --
         speed = math.sqrt(boid['vx']**2 + boid['vy']**2)
         if speed < app.minSpeed:
             # extract directions
@@ -246,8 +309,6 @@ def updateBoids(app):
         if speed > app.maxSpeed:
             xDir, yDir = (boid['vx'] / speed), (boid['vy'] / speed)
             boid['vx'], boid['vy'] = xDir * app.maxSpeed, yDir * app.maxSpeed
-
-        # -- exempt code end --
 
         # once all changes made, increment positions
         boid['x'] += boid['vx']
@@ -315,14 +376,11 @@ def onMouseMove(app, mouseX, mouseY):
 
 
 def onKeyPress(app, key):
-    if key == 'space':
-        app.showMenu = True if app.showMenu == False else False
-
     if key == 'r':
         resetApp(app)
 
     if key == 'p':
-        app.predMode = True if app.predMode == False else False
+        app.predMode = not app.predMode
 
     # weather
     if key == 'w':
@@ -396,6 +454,17 @@ def onStep(app):
     for cloud in app.clouds:
         cloud.updatePos(app)
 
+    # -- exempt code (clauded) --
+    if abs(app.windFactor) > 0.1:
+        for _ in range(int(abs(app.windFactor) * 8)):  # increased from 3 to 8
+            app.windParticles.append(WindParticle(app))
+
+    app.windParticles = [p for p in app.windParticles if p.opacity > 0]
+
+    for p in app.windParticles:
+        p.update(app)
+    # -- exempt code --
+
 
 class Cloud:
     def __init__(self, x, y, scale):
@@ -453,6 +522,26 @@ class TempShade(Overlay):
         opacity = int(abs(app.tempFactor) * self.opacity)
         drawRect(0, 0, app.width, app.height,
                  fill=rgb(r, g, b), opacity=opacity)
+
+
+# -- exempt code (clauded) --
+class WindParticle:
+    def __init__(self, app):
+        self.x = random.randint(0, app.width)
+        self.y = random.randint(0, app.height)
+        self.size = random.uniform(2, 5)
+        self.opacity = random.randint(50, 100)
+        self.speed = random.uniform(1, 3)
+
+    def update(self, app):
+        self.x += app.windFactor * 6 * self.speed  # faster drift
+        self.y += random.uniform(-0.5, 0.5)         # slight vertical wobble
+        self.opacity -= 1             # fade out over time
+
+    def draw(self):
+        drawCircle(self.x, self.y, self.size,
+                   fill='white', opacity=int(self.opacity))
+# -- end exempt --
 
 
 def main():
