@@ -190,9 +190,6 @@ def drawMenu(app):
         drawRect(0, app.height//2 - 30, 25, 60, opacity=70)
         drawLabel('→', 12, app.height//2, fill='white', size=20)
 
-# boids as triangles
-
-
 def onMousePress(app, mouseX, mouseY):
     # this is for the menu opening button
     if not app.menuOpen:
@@ -202,7 +199,7 @@ def onMousePress(app, mouseX, mouseY):
         if mouseX < 50 and mouseY < 50:
             app.menuOpen = False
 
-
+# Boids as triangles
 def drawBoid(boid):
     angle = math.atan2(boid['vy'], boid['vx'])
     size = 4
@@ -221,9 +218,9 @@ def drawBoid(boid):
 
     drawPolygon(x1, y1, x2, y2, x3, y3)
 
-# Claude helped write this, and my lovely mentor Meabh helped come up w idea to reduce lag :)
+# Claude helped outline, and my lovely mentor Meabh helped come up w idea to reduce lag :)
 
-# adding all the boids to respective cells in hypothetical grid
+# adding all the boids to respective cells in spatial grid
 
 
 def buildGrid(app):
