@@ -41,7 +41,7 @@ def onAppStart(app):
 def resetApp(app):
     app.stepsPerSecond = 12
 
-    app.numBoids = 800
+    app.numBoids = 500
     app.visRange = 100  # boids will match avg velocity & CoM of other boids here
     app.protectRange = 20  # boids move away from other boids here
 
@@ -261,35 +261,29 @@ def buildGrid(app):
 
 
 def updateBoids(app):
-    # squared to calculate dist w/ sqrt
-    visRange2 = app.visRange ** 2
-    protectRange2 = app.protectRange ** 2
-    margin = app.margin
     cellSize = app.visRange
     grid = buildGrid(app)
 
     for i, boid in enumerate(app.boids):
-        # zeroed so each boid's position can be added to it as changes happen
-        xPosAvg = yPosAvg = zPosAvg = xVelAvg = yVelAvg = zVelAvg = 0
-        closeDx = closeDy = closeDz = 0
-        neighbors = 0
+        # for storing neighbor idx and dist from curr boid
+        potentialNeighbors = []
 
         boidRow = int(boid['y'] // cellSize)
         boidCol = int(boid['x'] // cellSize)
         boidDep = int(boid['z'] // cellSize)
 
-        # check boids in neighboring cells
+        # get boids from 3D grid
         for drow in [-1, 0, 1]:
             for dcol in [-1, 0, 1]:
                 for ddep in [-1, 0, 1]:
-                    neighborkey = (boidRow + drow, boidCol +
-                                   dcol, boidDep + ddep)
+                    key = (boidRow + drow, boidCol +
+                           dcol, boidDep + ddep)
                     # get the boids in the neighboring cells
-                    for j in grid.get((boidRow + drow, boidCol + dcol), []):
+                    for j in grid.get(key, []):
                         # skip "current" outer loop boid
                         if i == j:
                             continue
-        # end citation
+
                         # actually grab each other boid from neighboring grids
                         other = app.boids[j]
 
@@ -299,26 +293,38 @@ def updateBoids(app):
                         dz = boid['z'] - other['z']
                         dist2 = dx ** 2 + dy ** 2 + dz ** 2
 
-                        if dist2 < protectRange2:
-                            # FOR SEPARATION -- sum of distances from every boid in protected range
-                            closeDx += dx
-                            closeDy += dy
-                            closeDz += dz
-                        elif dist2 < visRange2:
-                            # FOR COHESION & ALIGNMENT -- sum up pos of neighboids
-                            xPosAvg += other['x']
-                            yPosAvg += other['y']
-                            zPosAvg += other['z']
-                            xVelAvg += other['vx']
-                            yVelAvg += other['vy']
-                            zVelAvg += other['vz']
-                            neighbors += 1  # increment neighbirds used to calculate avgs
+                        potentialNeighbors.append((j, dist2))
 
-        # call separation
-        separation(app, boid, closeDx, closeDy, closeDz, margin)
+        # taking closest 7 neighbors
+        potentialNeighbors.sort(key=lambda x: x[1])
+        closestSeven = potentialNeighbors[:7]
+
+        xPosAvg = yPosAvg = zPosAvg = xVelAvg = yVelAvg = zVelAvg = 0
+        closeDx = closeDy = closeDz = 0
+
+        for j, dist2 in closestSeven:
+            other = app.boids[j]
+
+            if dist2 < app.protectRange ** 2:
+                # initiate vars in preperation for calling sep fctn
+                closeDx += (boid['x'] - other['x'])
+                closeDy += (boid['y'] - other['y'])
+                closeDz += (boid['z'] - other['z'])
+
+            # update for co & align
+            xPosAvg += other['x']
+            yPosAvg += other['y']
+            zPosAvg += other['z']
+            xVelAvg += other['vx']
+            yVelAvg += other['vy']
+            zVelAvg += other['vz']
+
+        # use count of neighbors found
+        numFound = len(closestSeven)
+        separation(app, boid, closeDx, closeDy, closeDz, app.margin)
 
         # call cohesion & alignment
-        cohesionAndAlignment(app, neighbors, boid, xPosAvg,
+        cohesionAndAlignment(app, numFound, boid, xPosAvg,
                              yPosAvg, zPosAvg, xVelAvg, yVelAvg, zVelAvg)
 
         # call predator fctn
